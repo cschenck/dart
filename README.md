@@ -1,3 +1,6 @@
+NOTE: This is a branch of Dart meant to work with ROS. It is currently under development and not ready for wide-use.
+=======
+
 dart: Dense Articulated Real-time Tracking
 =======
 

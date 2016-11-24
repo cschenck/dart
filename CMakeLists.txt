@@ -20,6 +20,7 @@ find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(DEPTHSENSE)
 find_package(OpenNI2)
+find_package(catkin REQUIRED)
 
 # find packages with pkg-config
 find_package(PkgConfig)
@@ -27,6 +28,14 @@ pkg_check_modules(eigen3 REQUIRED eigen3)
 pkg_check_modules(tinyxml REQUIRED tinyxml)
 pkg_check_modules(matheval REQUIRED libmatheval)
 pkg_check_modules(assimp assimp)
+
+catkin_package(
+  INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/src/ ${CUDA_INCLUDE_DIR} ${EIGEN3_INCLUDE_DIR} ${Pangolin_INCLUDE_DIRS}
+  LIBRARIES ${PROJECT_NAME}
+#  CATKIN_DEPENDS other_catkin_pkg
+  DEPENDS CUDA Eigen3
+  CFG_EXTRAS ${PROJECT_NAME}-extras.cmake
+)
 
 include_directories(
     ${eigen3_INCLUDE_DIRS}
@@ -171,6 +180,10 @@ set(depth_source_src
     ${PROJECT_SOURCE_DIR}/src/depth_sources/image_depth_source.h
 )
 
+set(rosnode_source_src
+    ${PROJECT_SOURCE_DIR}/src/rosnode/node.cpp
+)
+
 # set conditional sources
 if(OPENNI2_FOUND)
     include_directories(${OPENNI2_INCLUDE_DIRS})
@@ -228,6 +241,15 @@ if(CUDA_FOUND)
     cuda_add_library(${PROJECT_NAME} ${dart_src} ${point_cloud_srcs} ${depth_source_src} ${gpu_specific_src})
 else()
     add_library(${PROJECT_NAME} ${dart_src} ${point_cloud_srcs} ${depth_source_src} ${cpu_specific_src})
+endif()
+
+# add rosnode
+if(CUDA_FOUND)
+    include_directories(${CUDA_TOOLKIT_ROOT_DIR}/samples/common/inc)
+    add_definitions(-DCUDA_BUILD)
+    cuda_add_executable(${PROJECT_NAME}_node ${rosnode_source_src})
+else()
+    add_executable({PROJECT_NAME}_node ${rosnode_source_src})
 endif()
 
 # testing
