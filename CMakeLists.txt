@@ -18,9 +18,18 @@ find_package(PNG REQUIRED)
 find_package(OpenGL REQUIRED QUIET)
 find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
+find_package(Pangolin REQUIRED)
 find_package(DEPTHSENSE)
 find_package(OpenNI2)
-find_package(catkin REQUIRED)
+find_package(Threads)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
+  std_msgs
+  sensor_msgs
+  visualization_msgs
+  image_transport
+)
 
 # find packages with pkg-config
 find_package(PkgConfig)
@@ -38,21 +47,28 @@ catkin_package(
 )
 
 include_directories(
+    ${catkin_INCLUDE_DIRS}
     ${eigen3_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIRS}
     ${OPENGL_INCLUDE_DIR}
     ${GLUT_INCLUDE_DIR}
     ${GLEW_INCLUDE_DIRS}
     ${tinyxml_INCLUDE_DIR}
+    ${Pangolin_INCLUDE_DIRS}
 )
-link_directories(${tinyxml_LIBRARY_DIRS})
+link_directories(
+    ${tinyxml_LIBRARY_DIRS}
+    ${Pangolin_LIBRARY_DIRS}
+)
 link_libraries(
+    ${catkin_LIBRARIES} 
     ${PNG_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${GLUT_glut_LIBRARY}
     ${GLEW_LIBRARIES}
     ${tinyxml_LIBRARIES}
     ${matheval_LIBRARIES}
+    ${Pangolin_LIBRARIES}
 )
 
 # set dart source
@@ -180,8 +196,13 @@ set(depth_source_src
     ${PROJECT_SOURCE_DIR}/src/depth_sources/image_depth_source.h
 )
 
-set(rosnode_source_src
-    ${PROJECT_SOURCE_DIR}/src/rosnode/node.cpp
+set(rosnode_src
+    ${PROJECT_SOURCE_DIR}/src/rosnode/ROSDepthSource.h
+    ${PROJECT_SOURCE_DIR}/src/rosnode/ROSDepthSource.cpp
+    ${PROJECT_SOURCE_DIR}/src/rosnode/marker_publisher.h
+    ${PROJECT_SOURCE_DIR}/src/rosnode/marker_publisher.cpp
+    ${PROJECT_SOURCE_DIR}/src/rosnode/util.h
+    ${PROJECT_SOURCE_DIR}/src/rosnode/util.cpp
 )
 
 # set conditional sources
@@ -232,25 +253,26 @@ include_directories(${PROJECT_SOURCE_DIR}/src/)
 set(BUILD_SHARED_LIBS ON)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
-set(CUDA_NVCC_FLAGS "-arch=sm_35" "--use_fast_math"  "-O3" "--ptxas-options=--verbose") # "-fmad=false" "-DTHRUST_DEVICE_BACKEND=THRUST_DEVICE_BACKEND_OMP"
+set(CUDA_NVCC_FLAGS "-arch=sm_35" "--use_fast_math"  "-O3" ) # "-fmad=false" "-DTHRUST_DEVICE_BACKEND=THRUST_DEVICE_BACKEND_OMP" "--ptxas-options=--verbose"
 
-# add library
+# add dart-library, rosnode-library, rosnode-exec, and rosnode-tests
 if(CUDA_FOUND)
     include_directories(${CUDA_TOOLKIT_ROOT_DIR}/samples/common/inc)
     add_definitions(-DCUDA_BUILD)
     cuda_add_library(${PROJECT_NAME} ${dart_src} ${point_cloud_srcs} ${depth_source_src} ${gpu_specific_src})
+    cuda_add_library(${PROJECT_NAME}_rosnode ${rosnode_src})
+    cuda_add_executable(${PROJECT_NAME}_node ${PROJECT_SOURCE_DIR}/src/rosnode/node.cpp)
+    cuda_add_executable(test_marker_publisher ${PROJECT_SOURCE_DIR}/src/rosnode/test_marker_publisher.cpp)
 else()
     add_library(${PROJECT_NAME} ${dart_src} ${point_cloud_srcs} ${depth_source_src} ${cpu_specific_src})
+    add_library(${PROJECT_NAME}_rosnode ${rosnode_src})
+    add_executable(${PROJECT_NAME}_node ${PROJECT_SOURCE_DIR}/src/rosnode/node.cpp)
+    add_executable(test_marker_publisher ${PROJECT_SOURCE_DIR}/src/rosnode/test_marker_publisher.cpp)
 endif()
+target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} ${PROJECT_NAME}_rosnode)
+target_link_libraries(test_marker_publisher ${PROJECT_NAME} ${PROJECT_NAME}_rosnode)
 
-# add rosnode
-if(CUDA_FOUND)
-    include_directories(${CUDA_TOOLKIT_ROOT_DIR}/samples/common/inc)
-    add_definitions(-DCUDA_BUILD)
-    cuda_add_executable(${PROJECT_NAME}_node ${rosnode_source_src})
-else()
-    add_executable({PROJECT_NAME}_node ${rosnode_source_src})
-endif()
+
 
 # testing
 find_package(GTest)

@@ -81,6 +81,7 @@ bool Tracker::addModel(const std::string & filename,
     const int substrStart = lastSlash < filename.size() ? lastSlash + 1: 0;
     const std::string modelName = filename.substr(substrStart, diff > 0 ? diff : filename.size() - substrStart);
     std::cout << "model name: " << modelName << std::endl;
+    model.setName(modelName);
 
 //    // TODO
 //    if (model.getNumGeoms() < 2) {

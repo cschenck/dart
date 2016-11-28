@@ -111,6 +111,9 @@ public:
     void setModelVersion(const int modelVersion) { _modelVersion = modelVersion; }
 
     virtual const SE3 getTransformJointAxisToParent(const int joint) const = 0;
+    
+    std::string getName() const { return _model_name; }
+    void setName(std::string name) { _model_name = name; }
 
 protected:
     int _dimensionality;
@@ -130,6 +133,8 @@ protected:
 
     static ModelRenderer * _renderer;
     std::vector<int> _frameSdfNumbers;
+    
+    std::string _model_name;
 
 
 
