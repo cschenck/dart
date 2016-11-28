@@ -136,7 +136,7 @@ public:
         make_pyramid(1.0, &(obj2.meshes[0][1].faces), &(obj2.meshes[0][1].verts));
         reverse_faces(&(obj2.meshes[0][1].faces));
         obj2.meshes[0][1].geom_id = 1;
-        obj2.meshes[0][1].size = make_float3(1,1.5,1);
+        obj2.meshes[0][1].size = make_float3(0.5,1.5,1);
         obj2.meshes[0][1].rel_tran = dart::SE3FromTranslation(0.0f, -1.0f, 0.0f)*dart::SE3FromRotationX(M_PI);
         obj2.geom_id_map[obj2.meshes[0][1].geom_id] = &(obj2.meshes[0][1]);
     }

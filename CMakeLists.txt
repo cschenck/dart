@@ -262,15 +262,18 @@ if(CUDA_FOUND)
     cuda_add_library(${PROJECT_NAME} ${dart_src} ${point_cloud_srcs} ${depth_source_src} ${gpu_specific_src})
     cuda_add_library(${PROJECT_NAME}_rosnode ${rosnode_src})
     cuda_add_executable(${PROJECT_NAME}_node ${PROJECT_SOURCE_DIR}/src/rosnode/node.cpp)
+    cuda_add_executable(test_robot_viz ${PROJECT_SOURCE_DIR}/src/rosnode/test_robot_viz.cpp)
     cuda_add_executable(test_marker_publisher ${PROJECT_SOURCE_DIR}/src/rosnode/test_marker_publisher.cpp)
 else()
     add_library(${PROJECT_NAME} ${dart_src} ${point_cloud_srcs} ${depth_source_src} ${cpu_specific_src})
     add_library(${PROJECT_NAME}_rosnode ${rosnode_src})
     add_executable(${PROJECT_NAME}_node ${PROJECT_SOURCE_DIR}/src/rosnode/node.cpp)
+    add_executable(test_robot_viz ${PROJECT_SOURCE_DIR}/src/rosnode/test_robot_viz.cpp)
     add_executable(test_marker_publisher ${PROJECT_SOURCE_DIR}/src/rosnode/test_marker_publisher.cpp)
 endif()
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} ${PROJECT_NAME}_rosnode)
 target_link_libraries(test_marker_publisher ${PROJECT_NAME} ${PROJECT_NAME}_rosnode)
+target_link_libraries(test_robot_viz ${PROJECT_NAME} ${PROJECT_NAME}_rosnode)
 
 
 

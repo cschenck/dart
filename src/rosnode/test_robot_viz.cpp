@@ -118,11 +118,11 @@ void setModelJoints(dart::Pose* pose)
         if(js.find(name) != js.end())
         {
             pose->getArticulation()[i] = js[name];
-            cout << name << " = " << js[name] << endl;
+            //cout << name << " = " << js[name] << endl;
         }
         else
         {
-            printf("Error: Joint name %s not found in ros joint_states message.\n", name.c_str());   
+            //printf("Error: Joint name %s not found in ros joint_states message.\n", name.c_str());   
         }
     }
     
@@ -132,40 +132,36 @@ int main(int argc, char** argv)
 {
     string depth_topic;
     string rgb_topic;
-    string cmd_topic;
-    string out_topic;
     string url;
     string web_dir;
     string marker_topic;
-    bool use_viz;
+    string model_fp;
+    string joint_topic;
     try
     {
         TCLAP::CmdLine cmd("DART with ROS", ' ', "0.1");
         TCLAP::ValueArg<std::string> dt("d","depth_topic","The ROS topic to listen to for depth data.",false,"/camera/depth_registered/image_raw","string");
         TCLAP::ValueArg<std::string> rt("r","rgb_topic","The ROS topic to listen to for rgb data.",false,"/camera/rgb/image_color","string");
-        TCLAP::ValueArg<std::string> ct("c","cmd_topic","The ROS topic to listen to for tracking commands.",false,"/dart/cmd","string");
-        TCLAP::ValueArg<std::string> pt("p","pose_topic","The ROS topic to publish object poses to.",false,"/dart/pose","string");
         TCLAP::ValueArg<std::string> va_url("u","url","The url that rviz can use to access the webserver on this machine. This is used to pass the model files to rviz.",false,"","string");
         TCLAP::ValueArg<std::string> va_wd("w","web_dir","The folder on this machine corresponding to the --url flag. The model files will be written here.",false,"","string");
-        TCLAP::SwitchArg viz("v","viz","Run the marker publisher to visualize the dart state in rviz.", false);
         TCLAP::ValueArg<std::string> mt("m","marker_topic","The topic the marker publisher will publish the model markers to.", false, "dart_markers", "string");
+        TCLAP::ValueArg<std::string> jt("j","joint_state_topic","The topic to listen to for the state of the robot joints.", false, "/robot/joint_states", "string");
+        TCLAP::ValueArg<std::string> model("o","robot_model","The xml file for the robot model.", true, "", "string");
         cmd.add(dt);
         cmd.add(rt);
-        cmd.add(ct);
-        cmd.add(pt);
         cmd.add(va_url);
         cmd.add(va_wd);
-        cmd.add(viz);
         cmd.add(mt);
+        cmd.add(model);
+        cmd.add(jt);
         cmd.parse(argc, argv);
         depth_topic = dt.getValue();
         rgb_topic = rt.getValue();
-        cmd_topic = ct.getValue();
-        out_topic = pt.getValue();
         url = va_url.getValue();
         web_dir = va_wd.getValue();
-        use_viz = viz.getValue();
         marker_topic = mt.getValue();
+        model_fp = model.getValue();
+        joint_topic = jt.getValue();
     }
     catch(TCLAP::ArgException &e)
     {
@@ -175,28 +171,26 @@ int main(int argc, char** argv)
     
     cout << "Listening for depth frames on topic: " << depth_topic << endl;
     cout << "Listening for rgb frames on topic: " << rgb_topic << endl;
-    cout << "Listening for commands on topic: " << cmd_topic << endl;
-    cout << "Publishing poses to topic: " << out_topic << endl;
-    if(use_viz)
+
+
+    if(web_dir.size() == 0 || url.size() == 0)
     {
-        if(web_dir.size() == 0 || url.size() == 0)
+        printf("web_dir and url not fully specified, attempting to set defaults...\n");
+        if(!set_default_url(&url, &web_dir))
         {
-            printf("web_dir and url not fully specified, attempting to set defaults...\n");
-            if(!set_default_url(&url, &web_dir))
-            {
-                printf("Unable to set defaults for web_dir and url. Please specify as command line args.\n");
-                return 1;
-            }
+            printf("Unable to set defaults for web_dir and url. Please specify as command line args.\n");
+            return 1;
         }
-        cout << "Publishing model files at url: " << url << endl;
-        cout << "Placing models files in folder: " << web_dir << endl;
     }
+    cout << "Publishing model files at url: " << url << endl;
+    cout << "Placing models files in folder: " << web_dir << endl;
+
     
     ROS_INFO("Starting dart node.");
     ros::init(argc, argv, "dart");
     
     ros::NodeHandle* rosNode = new ros::NodeHandle();
-    ros::Subscriber* sub = new ros::Subscriber(rosNode->subscribe("/robot/joint_states", 1, &setJointState));
+    ros::Subscriber* sub = new ros::Subscriber(rosNode->subscribe(joint_topic, 1, &setJointState));
     pthread_mutex_init(&joint_state_lock, NULL);
     
     cudaGLSetGLDevice(0);
@@ -220,13 +214,12 @@ int main(int argc, char** argv)
     depthSource->startRosSpinner();
     tracker.addDepthSource(depthSource.get());
     
-    MarkerPublisher* mp = NULL;
-    if(use_viz)
-        mp = new MarkerPublisher(url, web_dir, marker_topic);
+    MarkerPublisher* mp = new MarkerPublisher(url, web_dir, marker_topic);
     
     //tracker.addModel("models/spaceJustin/spaceJustinHandRight.xml");
     //tracker.addModel("models/ikeaMug/ikeaMug.xml");
-    tracker.addModel("models/baxter/baxter_rosmesh_closedgripper.xml");    
+    //tracker.addModel("models/baxter/baxter_rosmesh_closedgripper.xml");    
+    tracker.addModel(model_fp);
                      
     
     dart::Pose pose = tracker.getPose(0);
@@ -244,16 +237,14 @@ int main(int argc, char** argv)
         pose = tracker.getPose(0);
         setModelJoints(&pose);
         tracker.getModel(0).setPose(pose);
-        if(use_viz)
-            mp->update(tracker, depthSource->getHeader());
+        mp->update(tracker, depthSource->getHeader());
         r.sleep();
     }
     
     depthSource->stopRosSpinner();
     ros::shutdown();
     
-    if(mp != NULL)
-        delete mp;
+    delete mp;
         
     sub->shutdown();
     delete rosNode;

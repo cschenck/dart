@@ -42,6 +42,7 @@ void MarkerPublisher::update(const ObjectInterface& tracker, std_msgs::Header he
                     ii = _addNewMeshMarker(tracker, obj_name, frame, geom);
                 mesh_marker& mesh = _meshes[ii];
                 visualization_msgs::Marker& marker = _markers.markers[ii];
+                // TODO also multiply by model pose.
                 dart::SE3 t = tracker.frameTransform(obj, frame)*tracker.relativeGeomTransform(obj, geom);
                 float4 rot = SE3ToQuaternion(t);
                 float3 tran = SE3ToTranslation(t);
@@ -88,7 +89,7 @@ int MarkerPublisher::_addNewMeshMarker(const ObjectInterface& tracker, const str
 {
     string fp = combine_paths(_web_dir, object_name + strprintf("_%d.stl", geom_id));
     string url = combine_paths(_url, object_name + strprintf("_%d.stl", geom_id));
-    printf("%s\n", url.c_str());
+    //printf("%s\n", url.c_str());
     int id = _idFromName(tracker, object_name);
     // Write model file.
     _writeBinarySTL(fp, tracker.meshFaces(id, geom_id), tracker.meshVerts(id, geom_id), tracker.meshNumFaces(id, geom_id), tracker.meshNumVerts(id, geom_id));

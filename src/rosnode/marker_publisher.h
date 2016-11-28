@@ -53,7 +53,7 @@ public:
     inline int numFrames(int object_id) const { return _tracker.getModel(object_id).getNumFrames(); }
     inline int numGeoms(int object_id, int frame_id) const { return _tracker.getModel(object_id).getFrameNumGeoms(frame_id); }
     inline int geomID(int object_id, int frame_id, int idx) const { return _tracker.getModel(object_id).getFrameGeoms(frame_id)[idx]; }
-    inline dart::SE3 frameTransform(int object_id, int frame_id) const { return _tracker.getModel(object_id).getTransformModelToFrame(frame_id); }
+    inline dart::SE3 frameTransform(int object_id, int frame_id) const { return _tracker.getModel(object_id).getTransformFrameToModel(frame_id); }
     inline dart::SE3 relativeGeomTransform(int object_id, int geom_id) const { return _tracker.getModel(object_id).getGeometryTransform(geom_id); }
     inline float3 geomScale(int object_id, int geom_id) const { return _tracker.getModel(object_id).getGeometryScale(geom_id); }
     inline const int3* meshFaces(int object_id, int geom_id) const { return _tracker.getModel(object_id).getMesh(_tracker.getModel(object_id).getMeshNumber(geom_id)).faces; }
@@ -73,6 +73,7 @@ public:
     MarkerPublisher(string url, string web_dir, string topic);
     ~MarkerPublisher();
     void update(const ObjectInterface& tracker, std_msgs::Header header);
+    void update(const dart::Tracker& tracker, std_msgs::Header header) { update(TrackerWrapper(tracker), header); }
 
 private:
     int _getMeshMarker(const string& object_name, int frame_id, int geom_id);

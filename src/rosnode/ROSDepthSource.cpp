@@ -123,6 +123,8 @@ void ROSDepthSource::setDepthData(const sensor_msgs::ImageConstPtr& msg)
         //TODO ask Tanner how to set these correctly
         _focalLength = make_float2(535.*_depthWidth/640,535.*_depthWidth/640);
         _principalPoint = make_float2(_depthWidth/2,_depthHeight/2);
+        
+        header = msg->header;
     }
     
     memcpy(depth_data_volatile, msg->data.data(), msg->height*msg->width*sizeof(ushort));

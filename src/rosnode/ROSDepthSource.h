@@ -6,6 +6,7 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
+#include <std_msgs/Header.h>
 
 #include "depth_sources/depth_source.h"
 
@@ -27,6 +28,8 @@ public:
     const ushort *getDeviceDepth() const;
 
     const uchar3 *getColor() const;
+    
+    std_msgs::Header getHeader() const { return header; }
 
     dart::ColorLayout getColorLayout() const { return dart::LAYOUT_BGR; }
     
@@ -71,6 +74,7 @@ private:
     ushort* depth_data_volatile;
     ushort* depth_data_stable;
     ushort* depth_data_device;
+    std_msgs::Header header;
     
     int depth_width;
     int depth_height;
