@@ -150,6 +150,7 @@ public:
     
     inline int numObjects() const { return _objects.size(); }
     inline string objectName(int object_id) const { return _objects[object_id].name; }
+    inline dart::SE3 objectTransform(int object_id) const { return dart::SE3FromTranslation(0,0,0); }
     inline int numFrames(int object_id) const { return _objects[object_id].frame_trans.size(); }
     inline int numGeoms(int object_id, int frame_id) const { return _objects[object_id].meshes[frame_id].size(); }
     inline int geomID(int object_id, int frame_id, int idx) const { return _objects[object_id].meshes[frame_id][idx].geom_id; }

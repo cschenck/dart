@@ -1,6 +1,9 @@
 
 #include <string>
 
+#include <vector_types.h>
+#include <vector_functions.h>
+
 #include "geometry/SE3.h"
 
 using namespace std;
@@ -32,4 +35,7 @@ float3 cross(const float3& left, const float3& right);
 //float dot(const float3& left, const float3& right);
 
 float3 norm(const float3& v);
+
+__device__ __host__
+float3 uvd_to_xyz(float3 uvd, float2 focal_length, float2 pp, int width, int height);
 

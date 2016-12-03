@@ -18,7 +18,8 @@ find_package(PNG REQUIRED)
 find_package(OpenGL REQUIRED QUIET)
 find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
-find_package(Pangolin REQUIRED)
+#find_package(Pangolin REQUIRED)
+find_package(PCL REQUIRED)
 find_package(DEPTHSENSE)
 find_package(OpenNI2)
 find_package(Threads)
@@ -39,7 +40,7 @@ pkg_check_modules(matheval REQUIRED libmatheval)
 pkg_check_modules(assimp assimp)
 
 catkin_package(
-  INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/src/ ${CUDA_INCLUDE_DIR} ${EIGEN3_INCLUDE_DIR} ${Pangolin_INCLUDE_DIRS}
+  INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/src/ ${CUDA_INCLUDE_DIR} ${EIGEN3_INCLUDE_DIR} #${Pangolin_INCLUDE_DIRS}
   LIBRARIES ${PROJECT_NAME}
 #  CATKIN_DEPENDS other_catkin_pkg
   DEPENDS CUDA Eigen3
@@ -54,11 +55,13 @@ include_directories(
     ${GLUT_INCLUDE_DIR}
     ${GLEW_INCLUDE_DIRS}
     ${tinyxml_INCLUDE_DIR}
-    ${Pangolin_INCLUDE_DIRS}
+    #${Pangolin_INCLUDE_DIRS}
+    ${PCL_INCLUDE_DIRS}
 )
 link_directories(
     ${tinyxml_LIBRARY_DIRS}
-    ${Pangolin_LIBRARY_DIRS}
+    #${Pangolin_LIBRARY_DIRS}
+    ${PCL_LIBRARY_DIRS}
 )
 link_libraries(
     ${catkin_LIBRARIES} 
@@ -68,8 +71,11 @@ link_libraries(
     ${GLEW_LIBRARIES}
     ${tinyxml_LIBRARIES}
     ${matheval_LIBRARIES}
-    ${Pangolin_LIBRARIES}
+    #${Pangolin_LIBRARIES}
+    ${PCL_LIBRARIES}
 )
+
+add_definitions(${PCL_DEFINITIONS})
 
 # set dart source
 set(dart_src
@@ -203,6 +209,13 @@ set(rosnode_src
     ${PROJECT_SOURCE_DIR}/src/rosnode/marker_publisher.cpp
     ${PROJECT_SOURCE_DIR}/src/rosnode/util.h
     ${PROJECT_SOURCE_DIR}/src/rosnode/util.cpp
+    ${PROJECT_SOURCE_DIR}/src/rosnode/util.cu
+    ${PROJECT_SOURCE_DIR}/src/rosnode/joint_state_listener.h
+    ${PROJECT_SOURCE_DIR}/src/rosnode/joint_state_listener.cpp
+    ${PROJECT_SOURCE_DIR}/src/rosnode/command_listener.h
+    ${PROJECT_SOURCE_DIR}/src/rosnode/command_listener.cpp
+    ${PROJECT_SOURCE_DIR}/src/rosnode/pointcloud_processor.h
+    ${PROJECT_SOURCE_DIR}/src/rosnode/pointcloud_processor.cpp
 )
 
 # set conditional sources

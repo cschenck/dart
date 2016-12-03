@@ -29,7 +29,7 @@ public:
 
     const uchar3 *getColor() const;
     
-    std_msgs::Header getHeader() const { return header; }
+    std_msgs::Header getHeader() const { return _header_stable; }
 
     dart::ColorLayout getColorLayout() const { return dart::LAYOUT_BGR; }
     
@@ -74,7 +74,8 @@ private:
     ushort* depth_data_volatile;
     ushort* depth_data_stable;
     ushort* depth_data_device;
-    std_msgs::Header header;
+    std_msgs::Header _header_stable;
+    std_msgs::Header _header_volatile;
     
     int depth_width;
     int depth_height;

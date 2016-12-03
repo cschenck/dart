@@ -83,7 +83,7 @@ bool ROSDepthSource::initialize(const string& depth_topic, const string& rgb_top
     //get the first depth image before adding this to the tracker
     ros::Rate rate(100);
     printf("Waiting on first depth and color frames...\n");
-    while(depth_data_volatile == NULL && color_data_volatile == NULL)
+    while(depth_data_volatile == NULL || color_data_volatile == NULL)
     {
         ros::spinOnce();
         rate.sleep();
@@ -124,8 +124,9 @@ void ROSDepthSource::setDepthData(const sensor_msgs::ImageConstPtr& msg)
         _focalLength = make_float2(535.*_depthWidth/640,535.*_depthWidth/640);
         _principalPoint = make_float2(_depthWidth/2,_depthHeight/2);
         
-        header = msg->header;
     }
+    
+    _header_volatile = msg->header;
     
     memcpy(depth_data_volatile, msg->data.data(), msg->height*msg->width*sizeof(ushort));
     pthread_mutex_unlock(&depth_data_lock);
@@ -183,6 +184,7 @@ void ROSDepthSource::swapDepthPointers()
     ushort* tmp = depth_data_stable;
     depth_data_stable = depth_data_volatile;
     depth_data_volatile = tmp;
+    _header_stable = _header_volatile;
     pthread_mutex_unlock(&depth_data_lock);
 }
 

@@ -36,6 +36,8 @@ inline PREFIX SE3 SE3FromDH(const float theta, const float d, const float a, con
 inline PREFIX SE3 SE3FromPosAxis(const float3 position, const float3 axis, const float theta);
 inline PREFIX SE3 SE3FromTranslation(const float3 translation);
 inline PREFIX SE3 SE3FromTranslation(const float x, const float y, const float z);
+inline PREFIX SE3 SE3FromQuaternion(const float4 quaternion);
+inline PREFIX SE3 SE3FromQuaternion(float x, float y, float z, float w);
 inline PREFIX SE3 SE3FromRotationX(const float theta);
 inline PREFIX SE3 SE3FromRotationY(const float theta);
 inline PREFIX SE3 SE3FromRotationZ(const float theta);
@@ -203,6 +205,22 @@ inline PREFIX SE3 SE3FromTranslation(const float x, const float y, const float z
     return SE3(make_float4(1,0,0,x),
                make_float4(0,1,0,y),
                make_float4(0,0,1,z));
+}
+
+inline PREFIX SE3 SE3FromQuaternion(const float4 quaternion) {
+    return SE3FromQuaternion(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+}
+
+inline PREFIX SE3 SE3FromQuaternion(float x, float y, float z, float w) {
+    float m = sqrt(x*x + y*y + z*z + w*w);
+    x /= m; y /= m; z /= m; w /= m;
+    float sqw = w*w;
+    float sqx = x*x;
+    float sqy = y*y;
+    float sqz = z*z;
+    return SE3(make_float4(sqx - sqy - sqz + sqw,2.0*(x*y - z*w),2.0*(x*z + y*w),0),
+               make_float4(2.0*(x*y + z*w),-sqx + sqy - sqz + sqw,2.0*(y*z - x*w),0),
+               make_float4(2.0*(x*z - y*w),2.0*(y*z + x*w),-sqx - sqy + sqz + sqw,0));
 }
 
 inline PREFIX SE3 SE3FromRotationX(const float theta) {
