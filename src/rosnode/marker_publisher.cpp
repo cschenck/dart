@@ -155,7 +155,9 @@ int MarkerPublisher::_indexFromID(int marker_id)
 
 int MarkerPublisher::addUntrackedObject(const dart::SE3& pose, const float3& size)
 {
+    float3 color;
     int ret = _getFreeMarkerID();
+    ///*
     _markers.markers.resize(_markers.markers.size() + 1);
     visualization_msgs::Marker& marker = _markers.markers[_markers.markers.size()-1];
     marker.id = ret;
@@ -165,12 +167,103 @@ int MarkerPublisher::addUntrackedObject(const dart::SE3& pose, const float3& siz
     marker.scale.y = size.y;
     marker.scale.z = size.z;
     marker.color.a = 0.5;
-    float3 color = make_float3(1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX);
+    color = make_float3(1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX);
     marker.color.r = color.x;
     marker.color.g = color.y;
     marker.color.b = color.z;
     updateUntrackedObject(ret, pose);
+    //*/
     
+    /*int id = _getFreeMarkerID();
+    _markers.markers.resize(_markers.markers.size() + 1);
+    visualization_msgs::Marker& marker2 = _markers.markers[_markers.markers.size()-1];
+    marker2.id = id;
+    marker2.type = visualization_msgs::Marker::POINTS;
+    marker2.action = visualization_msgs::Marker::ADD;
+    marker2.scale.x = 0.02;
+    marker2.scale.y = 0.02;
+    marker2.scale.z = 0.02;
+    marker2.color.a = 1.0;
+    color = make_float3(1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX);
+    marker2.color.r = color.x;
+    marker2.color.g = color.y;
+    marker2.color.b = color.z;
+    marker2.points.resize(300);
+    for(int k = 0; k < marker2.points.size(); ++k)
+    {
+        float3 pt = make_float3((1.0*rand()/RAND_MAX - 0.5)*size.x, (1.0*rand()/RAND_MAX - 0.5)*size.y, 0);
+        pt = pose*pt;
+        marker2.points[k].x = pt.x;
+        marker2.points[k].y = pt.y;
+        marker2.points[k].z = pt.z;
+    }*/
+    
+    
+    for(int i = 0; i < 3; ++i)
+    {
+        float k = 0.2; // optional to scale the length of the arrows
+        // Unit vector on the axis.
+        float3 v2 = make_float3(i==0?k:0,i==1?k:0,i==2?k:0);
+        v2 = pose*v2;
+        float3 v1 = make_float3(0,0,0);
+        v1 = pose*v1;
+        
+        visualization_msgs::Marker marker3;
+        marker3.id =_getFreeMarkerID();
+        marker3.type = visualization_msgs::Marker::ARROW;
+        marker3.action = visualization_msgs::Marker::ADD;
+        marker3.scale.x = 0.01;
+        marker3.scale.y = 0.01;
+        marker3.scale.z = 0.01;
+        
+        geometry_msgs::Point p;
+        p.x = v1.x;
+        p.y = v1.y;
+        p.z = v1.z;
+        marker3.points.push_back(p);
+        p.x = v2.x;
+        p.y = v2.y;
+        p.z = v2.z;
+        marker3.points.push_back(p);
+        
+        marker3.color.a = 1.0;
+        marker3.color.r = (i == 0 ? 1.0 : 0.0);
+        marker3.color.g = (i == 1 ? 1.0 : 0.0);
+        marker3.color.b = (i == 2 ? 1.0 : 0.0);
+        _markers.markers.push_back(marker3);
+    }
+    
+    return ret;
+}
+
+int MarkerPublisher::addUntrackedObject(pcl::PointCloud<pcl::PointXYZINormal>::Ptr source, float filter)
+{
+    int ret = _getFreeMarkerID();
+    _markers.markers.resize(_markers.markers.size() + 1);
+    visualization_msgs::Marker& marker = _markers.markers[_markers.markers.size()-1];
+    marker.id = ret;
+    marker.type = visualization_msgs::Marker::POINTS;
+    marker.action = visualization_msgs::Marker::ADD;
+    marker.scale.x = 0.01;
+    marker.scale.y = 0.01;
+    marker.scale.z = 0.01;
+    marker.color.a = 1.0;
+    float3 color = make_float3(1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX);
+    marker.color.r = color.x;
+    marker.color.g = color.y;
+    marker.color.b = color.z;
+    //marker.points.resize(source->points.size());
+    for(int k = 0; k < source->points.size(); ++k)
+    {
+        if(filter < 0 || source->points[k].data_c[2] == filter)
+        {
+            marker.points.resize(marker.points.size() + 1);
+            int kk = marker.points.size() - 1;
+            marker.points[kk].x = source->points[k].x;
+            marker.points[kk].y = source->points[k].y;
+            marker.points[kk].z = source->points[k].z;
+        }
+    }
     return ret;
 }
 
@@ -182,10 +275,10 @@ void MarkerPublisher::updateUntrackedObject(int id, const dart::SE3& pose)
     marker.pose.position.x = tran.x;
     marker.pose.position.y = tran.y;
     marker.pose.position.z = tran.z;
-    marker.pose.orientation.w = rot.w;
     marker.pose.orientation.x = rot.x;
     marker.pose.orientation.y = rot.y;
     marker.pose.orientation.z = rot.z;
+    marker.pose.orientation.w = rot.w;
 }
 
 void MarkerPublisher::update(const ObjectInterface& tracker, std_msgs::Header header)
@@ -278,6 +371,9 @@ void MarkerPublisher::publishPointcloud(const dart::DepthSource<ushort,uchar3>* 
     }
     _pc_pub->publish(_pts);
 }
+
+
+
 
 int MarkerPublisher::_getMeshMarker(const string& object_name, int frame_id, int geom_id)
 {

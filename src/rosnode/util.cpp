@@ -1,4 +1,5 @@
 
+#include <algorithm>
 #include <math.h>
 #include <stdarg.h>
 #include <vector>
@@ -40,40 +41,54 @@ string combine_paths(const string& left, const string& right)
 float4 SE3ToQuaternion(const dart::SE3& source){
     
     float4 r;
+    float m00 = source.r0.x;
+    float m01 = source.r0.y;
+    float m02 = source.r0.z;
+    float m10 = source.r1.x;
+    float m11 = source.r1.y;
+    float m12 = source.r1.z;
+    float m20 = source.r2.x;
+    float m21 = source.r2.y;
+    float m22 = source.r2.z;
     
-    float tr = source.r0.x + source.r1.y + source.r2.z;
+    //swap(m01, m10);
+    //swap(m02, m20);
+    //swap(m12, m21);
+    
+    float tr = m00 + m11 + m22;
     if(tr > 0.){
         float s = sqrt(tr+1.) * 2.;
         r.w = 0.25 * s;
-        r.x = ( source.r2.y - source.r1.z ) / s;
-        r.y = ( source.r0.z - source.r2.x ) / s;
-        r.z = ( source.r1.x - source.r0.y ) / s;
+        r.x = ( m21 - m12 ) / s;
+        r.y = ( m02 - m20 ) / s;
+        r.z = ( m10 - m01 ) / s;
     }
     else{
-        if( source.r0.x > source.r1.y && source.r0.x > source.r2.z ){
-            float s = 2.f * sqrtf(1.f+source.r0.x-source.r1.y-source.r2.z);
-            r.w = (source.r2.y - source.r1.z) / s;
+        if( m00 > m11 && m00 > m22 ){
+            float s = 2.f * sqrtf(1.f+m00-m11-m22);
+            r.w = (m21 - m12) / s;
             r.x = 0.25f * s;
-            r.y = (source.r0.y + source.r1.x) / s;
-            r.z = (source.r0.z + source.r2.x) / s;
+            r.y = (m01 + m10) / s;
+            r.z = (m02 + m20) / s;
         }
-        else if(source.r1.y > source.r2.z){
-            float s = 2.f * sqrtf(1.f+source.r1.y-source.r0.x-source.r2.z);
-            r.w = (source.r0.z - source.r2.x) / s;
-            r.x = (source.r0.y + source.r1.x) / s;
+        else if(m11 > m22){
+            float s = 2.f * sqrtf(1.f+m11-m00-m22);
+            r.w = (m02 - m20) / s;
+            r.x = (m01 + m10) / s;
             r.y = 0.25 * s;
-            r.z = (source.r1.z + source.r2.y) / s;
+            r.z = (m12 + m21) / s;
         }
         else{
-            float s = 2.f * sqrtf(1.f+source.r2.z-source.r0.x-source.r1.y);
-            r.w = (source.r1.x - source.r0.y) / s;
-            r.x = (source.r0.z + source.r2.x) / s;
-            r.y = (source.r1.z + source.r2.y) / s;
+            float s = 2.f * sqrtf(1.f+m22-m00-m11);
+            r.w = (m10 - m01) / s;
+            r.x = (m02 + m20) / s;
+            r.y = (m12 + m21) / s;
             r.z = 0.25 * s;
         }
     }
     
-    return r;
+    float m = sqrt(r.x*r.x + r.y*r.y + r.z*r.z + r.w*r.w);
+    return make_float4(r.x/m, r.y/m, r.z/m, r.w/m);
 }
 
 float3 SE3ToTranslation(const dart::SE3& source)

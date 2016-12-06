@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <std_msgs/Header.h>
@@ -83,8 +85,10 @@ public:
     void update(const ObjectInterface& tracker, std_msgs::Header header);
     void update(const dart::Tracker& tracker, std_msgs::Header header) { update(TrackerWrapper(tracker), header); }
     int addUntrackedObject(const dart::SE3& pose, const float3& size);
+    int addUntrackedObject(pcl::PointCloud<pcl::PointXYZINormal>::Ptr source, float filter = -1);
     void updateUntrackedObject(int id, const dart::SE3& pose);
     void publishPointcloud(const dart::DepthSource<ushort,uchar3>* source, std_msgs::Header header);
+    
 
 private:
     int _getMeshMarker(const string& object_name, int frame_id, int geom_id);
