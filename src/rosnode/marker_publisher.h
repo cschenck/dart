@@ -49,6 +49,7 @@ public:
     virtual const float3* meshNorms(int object_id, int geom_id) const = 0;
     virtual int meshNumFaces(int object_id, int geom_id) const = 0;
     virtual int meshNumVerts(int object_id, int geom_id) const = 0;
+    virtual const dart::Grid3D<float>& getSdf(int object_id, int frame_id) const = 0;
 };
 
 class TrackerWrapper : public ObjectInterface
@@ -58,7 +59,7 @@ public:
     TrackerWrapper(const dart::Tracker& tracker) : _tracker(tracker) {}
     inline int numObjects() const { return _tracker.getNumModels(); }
     inline string objectName(int object_id) const { return _tracker.getModel(object_id).getName(); }
-    inline dart::SE3 objectTransform(int object_id) const { return _tracker.getModel(object_id).getTransformCameraToModel(); }
+    inline dart::SE3 objectTransform(int object_id) const { return _tracker.getModel(object_id).getTransformModelToCamera(); }
     inline int numFrames(int object_id) const { return _tracker.getModel(object_id).getNumFrames(); }
     inline int numGeoms(int object_id, int frame_id) const { return _tracker.getModel(object_id).getFrameNumGeoms(frame_id); }
     inline int geomID(int object_id, int frame_id, int idx) const { return _tracker.getModel(object_id).getFrameGeoms(frame_id)[idx]; }
@@ -70,6 +71,7 @@ public:
     inline const float3* meshNorms(int object_id, int geom_id) const { return _tracker.getModel(object_id).getMesh(_tracker.getModel(object_id).getMeshNumber(geom_id)).normals; }
     inline int meshNumFaces(int object_id, int geom_id) const { return _tracker.getModel(object_id).getMesh(_tracker.getModel(object_id).getMeshNumber(geom_id)).nFaces; }
     inline int meshNumVerts(int object_id, int geom_id) const { return _tracker.getModel(object_id).getMesh(_tracker.getModel(object_id).getMeshNumber(geom_id)).nVertices; }
+    inline const dart::Grid3D<float>& getSdf(int object_id, int frame_id) const { return _tracker.getModel(object_id).getSdf(_tracker.getModel(object_id).getFrameSdfNumber(frame_id)); }
 
 private:
     const dart::Tracker& _tracker;
@@ -88,11 +90,14 @@ public:
     int addUntrackedObject(pcl::PointCloud<pcl::PointXYZINormal>::Ptr source, float filter = -1);
     void updateUntrackedObject(int id, const dart::SE3& pose);
     void publishPointcloud(const dart::DepthSource<ushort,uchar3>* source, std_msgs::Header header);
+    void setCloudMask(const int* mask) { _cloud_mask = mask; }
+    void showSdfsInstead(bool show_sdfs_instead);
     
 
 private:
     int _getMeshMarker(const string& object_name, int frame_id, int geom_id);
     int _addNewMeshMarker(const ObjectInterface& tracker, const string& object_name, int frame_id, int geom_id);
+    int _addNewSdfMarker(const ObjectInterface& tracker, const string& object_name, int frame_id, int geom_id);
     void _writeBinarySTL(const string& fp, const int3* faces, const float3* verts, unsigned int nFaces, unsigned int nVerts);
     int _idFromName(const ObjectInterface& tracker, const string& object_name);
     int _indexFromID(int marker_id);
@@ -108,6 +113,8 @@ private:
     vector<mesh_marker> _meshes;
     visualization_msgs::MarkerArray _markers;
     sensor_msgs::PointCloud2Ptr _pts;
+    const int* _cloud_mask;
+    bool _show_sdfs_instead;
 };
 
 

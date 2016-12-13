@@ -12,6 +12,7 @@
 #include "depth_sources/depth_source.h"
 #include "geometry/SE3.h"
 #include "tracker.h" // <-- Somewhere in here is a cuda include that I can't seem to track down but is needed here.
+#include "util/mirrored_memory.h"
 
 #define OBJECT_TABLE_THRESHOLD 0.05
 #define PLANE_DISTANCE_THRESHOLD 0.01
@@ -40,6 +41,9 @@ public:
     const float3& getObjectSize(int i) const { return _object_sizes[i]; }
     dart::SE3 projectOntoTable(const dart::SE3& pose);
     float3 projectOntoTable(const float3& pt_orig);
+    void computeCloudMask(const dart::DepthSource<ushort,uchar3>* source);
+    const int* getDeviceMask() const { return _mask.devicePtr(); }
+    const int* getHostMask() { _mask.syncDeviceToHost(); return _mask.hostPtr(); }
     
     pcl::PointCloud<pcl::PointXYZINormal>::Ptr table_points;
 
@@ -54,6 +58,8 @@ private:
     
     vector<dart::SE3> _object_poses;
     vector<float3> _object_sizes;
+    
+    dart::MirroredVector<int> _mask;
 };
 
 

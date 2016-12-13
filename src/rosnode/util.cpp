@@ -168,7 +168,34 @@ float3 norm(const float3& v)
 	return make_float3(v.x/m, v.y/m, v.z/m);
 }
 
+// Borrowed from the answer here: http://stackoverflow.com/questions/7706339/grayscale-to-red-green-blue-matlab-jet-color-scale
+float interpolate( float val, float y0, float x0, float y1, float x1 ) {
+    return (val-x0)*(y1-y0)/(x1-x0) + y0;
+}
 
+float base( float val ) {
+    if ( val <= -0.75 ) return 0;
+    else if ( val <= -0.25 ) return interpolate( val, 0.0, -0.75, 1.0, -0.25 );
+    else if ( val <= 0.25 ) return 1.0;
+    else if ( val <= 0.75 ) return interpolate( val, 1.0, 0.25, 0.0, 0.75 );
+    else return 0.0;
+}
+
+float red( float gray ) {
+    return base( gray - 0.5 );
+}
+float green( float gray ) {
+    return base( gray );
+}
+float blue( float gray ) {
+    return base( gray + 0.5 );
+}
+
+float3 jetmapColor(float gray)
+{
+    float g = gray*2 - 1;
+    return make_float3(red(gray), green(gray), blue(gray));
+}
 
 
 

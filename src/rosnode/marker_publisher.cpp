@@ -88,7 +88,7 @@ bool set_default_url(string* url, string* web_dir)
 
 
 MarkerPublisher::MarkerPublisher(string url, string web_dir, string topic) :
-    _url(url), _web_dir(web_dir), _pc_pub(NULL)
+    _url(url), _web_dir(web_dir), _pc_pub(NULL), _cloud_mask(NULL), _show_sdfs_instead(false)
 {
     _ros_node = new ros::NodeHandle();
     _pub = new ros::Publisher(_ros_node->advertise<visualization_msgs::MarkerArray>(topic, 1));
@@ -141,6 +141,7 @@ MarkerPublisher::~MarkerPublisher()
     }
     delete _pub;
     delete _ros_node;
+    
 }
 
 int MarkerPublisher::_indexFromID(int marker_id)
@@ -291,15 +292,14 @@ void MarkerPublisher::update(const ObjectInterface& tracker, std_msgs::Header he
         string obj_name = tracker.objectName(obj);
         for(int frame = 0; frame < tracker.numFrames(obj); ++frame)
         {
-            for(int idx = 0; idx < tracker.numGeoms(obj, frame); ++idx)
+            if(_show_sdfs_instead)
             {
-                int geom = tracker.geomID(obj, frame, idx);
-                int ii = _getMeshMarker(obj_name, frame, geom);
+                int ii = _getMeshMarker(obj_name, frame, 0);
                 if(ii < 0)
-                    ii = _addNewMeshMarker(tracker, obj_name, frame, geom);
+                    ii = _addNewSdfMarker(tracker, obj_name, frame, 0);
                 mesh_marker& mesh = _meshes[ii];
                 visualization_msgs::Marker& marker = _markers.markers[_indexFromID(mesh.marker_id)];
-                dart::SE3 t = tracker.objectTransform(obj)*tracker.frameTransform(obj, frame)*tracker.relativeGeomTransform(obj, geom);
+                dart::SE3 t = tracker.objectTransform(obj)*tracker.frameTransform(obj, frame);
                 float4 rot = SE3ToQuaternion(t);
                 float3 tran = SE3ToTranslation(t);
                 marker.pose.position.x = tran.x;
@@ -310,6 +310,29 @@ void MarkerPublisher::update(const ObjectInterface& tracker, std_msgs::Header he
                 marker.pose.orientation.z = rot.z;
                 marker.pose.orientation.w = rot.w;
                 mesh.exists = true;
+            }
+            else
+            {
+                for(int idx = 0; idx < tracker.numGeoms(obj, frame); ++idx)
+                {
+                    int geom = tracker.geomID(obj, frame, idx);
+                    int ii = _getMeshMarker(obj_name, frame, geom);
+                    if(ii < 0)
+                        ii = _addNewMeshMarker(tracker, obj_name, frame, geom);
+                    mesh_marker& mesh = _meshes[ii];
+                    visualization_msgs::Marker& marker = _markers.markers[_indexFromID(mesh.marker_id)];
+                    dart::SE3 t = tracker.objectTransform(obj)*tracker.frameTransform(obj, frame)*tracker.relativeGeomTransform(obj, geom);
+                    float4 rot = SE3ToQuaternion(t);
+                    float3 tran = SE3ToTranslation(t);
+                    marker.pose.position.x = tran.x;
+                    marker.pose.position.y = tran.y;
+                    marker.pose.position.z = tran.z;
+                    marker.pose.orientation.x = rot.x;
+                    marker.pose.orientation.y = rot.y;
+                    marker.pose.orientation.z = rot.z;
+                    marker.pose.orientation.w = rot.w;
+                    mesh.exists = true;
+                }
             }
         }
     }
@@ -329,6 +352,18 @@ void MarkerPublisher::update(const ObjectInterface& tracker, std_msgs::Header he
     for(int i = 0; i < _markers.markers.size(); ++i)
         _markers.markers[i].header = header;
     _pub->publish(_markers);
+}
+
+void MarkerPublisher::showSdfsInstead(bool show_sdfs_instead)
+{
+    // Clear the markers.
+    for(int i = 0; i < _meshes.size(); ++i)
+    {
+        int j = _indexFromID(_meshes[i].marker_id);
+        _markers.markers.erase(_markers.markers.begin()+j);
+    }
+    _meshes.clear();
+    _show_sdfs_instead = show_sdfs_instead;
 }
 
 void set_point(void* ptr, float x, float y, float z, const uchar3& rgb)
@@ -362,7 +397,10 @@ void MarkerPublisher::publishPointcloud(const dart::DepthSource<ushort,uchar3>* 
             int i = k % _pts->width;
             int j = k/_pts->width;
             float3 pt = uvd_to_xyz(make_float3(i, j, depth), fl, pp, _pts->width, _pts->height);
-            set_point(vp, pt.x, pt.y, pt.z, cs[k]);
+            uchar3 color = cs[k];
+            if(_cloud_mask != NULL && _cloud_mask[k] == 0)
+                color.x = color.y = color.z = 0.0; //1.0*(0.0f + color.x + color.y + color.z)/3;
+            set_point(vp, pt.x, pt.y, pt.z, color);
         }
         else
         {
@@ -370,6 +408,7 @@ void MarkerPublisher::publishPointcloud(const dart::DepthSource<ushort,uchar3>* 
         }
     }
     _pc_pub->publish(_pts);
+    _cloud_mask = NULL;
 }
 
 
@@ -439,6 +478,86 @@ int MarkerPublisher::_addNewMeshMarker(const ObjectInterface& tracker, const str
     return ii;
 }
 
+int MarkerPublisher::_addNewSdfMarker(const ObjectInterface& tracker, const string& object_name, int frame_id, int geom_id)
+{
+    int id = _idFromName(tracker, object_name);
+    int ii = _meshes.size();
+    _meshes.resize(_meshes.size() + 1);
+    _meshes[ii].object_name = object_name;
+    _meshes[ii].frame_id = frame_id;
+    _meshes[ii].geom_id = geom_id;
+    
+    // Find the first available marker id.
+    int marker_id = _getFreeMarkerID();
+    _meshes[ii].marker_id = marker_id;
+    
+    // increase size of _markers vector
+    int jj = _markers.markers.size();
+    _markers.markers.resize(_markers.markers.size() + 1);
+    visualization_msgs::Marker& m = _markers.markers[jj];
+    m.id = marker_id;
+    m.type = visualization_msgs::Marker::POINTS;
+    m.action = visualization_msgs::Marker::ADD;
+    const dart::Grid3D<float>& sdf = tracker.getSdf(id, frame_id);
+    m.scale.x = m.scale.y = m.scale.z = sdf.resolution;
+    //m.color.a = 1.0;
+    if(_obj_colors.find(object_name) == _obj_colors.end())
+        _obj_colors[object_name] = make_float3(1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX, 1.0*rand()/RAND_MAX);
+    //float3 color = _obj_colors[object_name];
+    //m.color.r = color.x;
+    //m.color.g = color.y;
+    //m.color.b = color.z;
+    
+    float min_dis = 0;
+    float max_dis = 0;
+    for(int x = 0; x < sdf.dim.x; ++x)
+    {
+        for(int y = 0; y < sdf.dim.y; ++y)
+        {
+            for(int z = 0; z < sdf.dim.z; ++z)
+            {
+                int3 grid_pti = make_int3(x, y, z);
+                min_dis = min(min_dis, sdf.getValue(grid_pti));
+                max_dis = max(max_dis, sdf.getValue(grid_pti));
+            }
+        }
+    }
+    
+    m.points.clear();
+    m.colors.clear();
+    min_dis = -sdf.resolution*10;
+    max_dis = sdf.resolution*10;
+    for(int x = 0; x < sdf.dim.x; ++x)
+    {
+        for(int y = 0; y < sdf.dim.y; ++y)
+        {
+            for(int z = 0; z < sdf.dim.z; ++z)
+            {
+                int3 grid_pti = make_int3(x, y, z);
+                if(sdf.getValue(grid_pti) <= max_dis && sdf.getValue(grid_pti) >= min_dis)
+                {
+                    float3 grid_ptf = make_float3(x + 0.5, y + 0.5, z + 0.5);
+                    float3 pt = sdf.getWorldCoords(grid_ptf);
+                    m.points.resize(m.points.size() + 1);
+                    int i = m.points.size() - 1;
+                    m.points[i].x = pt.x;
+                    m.points[i].y = pt.y;
+                    m.points[i].z = pt.z;
+                    m.colors.resize(m.colors.size() + 1);
+                    float d = max(0.0, min(1.0, (max_dis - sdf.getValue(grid_pti))/(max_dis - min_dis)));
+                    float3 c = jetmapColor(d);
+                    m.colors[i].r = c.x;
+                    m.colors[i].g = c.y;
+                    m.colors[i].b = c.z;
+                    m.colors[i].a = 1.0;
+                }
+            }
+        }
+    }
+    
+    return ii;
+}
+
 int MarkerPublisher::_idFromName(const ObjectInterface& tracker, const string& object_name)
 {
     for(int i = 0; i < tracker.numObjects(); ++i)
@@ -503,6 +622,7 @@ void MarkerPublisher::_writeBinarySTL(const string& fp, const int3* faces, const
     }
     fclose(f);
 }
+
 
 
 

@@ -162,6 +162,7 @@ public:
     inline const float3* meshNorms(int object_id, int geom_id) const { return NULL; }
     inline int meshNumFaces(int object_id, int geom_id) const { return _objects[object_id].geom_id_map.at(geom_id)->faces.size(); }
     inline int meshNumVerts(int object_id, int geom_id) const { return _objects[object_id].geom_id_map.at(geom_id)->verts.size(); }
+    inline const dart::Grid3D<float>& getSdf(int object_id, int frame_id) const { throw -1; }
 
 private:
     vector<object> _objects;

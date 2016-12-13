@@ -209,13 +209,13 @@ set(rosnode_src
     ${PROJECT_SOURCE_DIR}/src/rosnode/marker_publisher.cpp
     ${PROJECT_SOURCE_DIR}/src/rosnode/util.h
     ${PROJECT_SOURCE_DIR}/src/rosnode/util.cpp
-    ${PROJECT_SOURCE_DIR}/src/rosnode/util.cu
     ${PROJECT_SOURCE_DIR}/src/rosnode/joint_state_listener.h
     ${PROJECT_SOURCE_DIR}/src/rosnode/joint_state_listener.cpp
     ${PROJECT_SOURCE_DIR}/src/rosnode/command_listener.h
     ${PROJECT_SOURCE_DIR}/src/rosnode/command_listener.cpp
     ${PROJECT_SOURCE_DIR}/src/rosnode/pointcloud_processor.h
     ${PROJECT_SOURCE_DIR}/src/rosnode/pointcloud_processor.cpp
+    ${PROJECT_SOURCE_DIR}/src/rosnode/pointcloud_processor.cu
 )
 
 # set conditional sources

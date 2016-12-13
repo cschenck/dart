@@ -27,7 +27,7 @@
 
 
 PointcloudProcessor::PointcloudProcessor() :
-_found_table(false)
+_found_table(false), _mask(0)
 {
 }
 
@@ -483,6 +483,7 @@ vector<pcl::PointCloud<pcl::PointXYZINormal>::Ptr> PointcloudProcessor::_findObj
     
     return ret;
 }
+
 
 
 
