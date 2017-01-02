@@ -24,9 +24,45 @@
 
 #define EIGEN_DONT_ALIGN
 
+#define LEFT_HAND_FRAME 16
+#define RIGHT_HAND_FRAME 7
+
 using namespace std;
 
+dart::PoseReduction* default_pose_reduction(const dart::Model& model)
+{
+    int nDimensions = model.getPoseDimensionality();
+    std::vector<float> jointMins, jointMaxs;
+    std::vector<std::string> jointNames;
+    for (int j=0; j<model.getNumJoints(); ++j) {
+        jointMins.push_back(model.getJointMin(j));
+        jointMaxs.push_back(model.getJointMax(j));
+        jointNames.push_back(model.getJointName(j));
+    }
+    dart::PoseReduction* poseReduction = new dart::NullReduction(nDimensions - 6,
+        jointMins.data(), jointMaxs.data(), jointNames.data());
+    return poseReduction;
+}
 
+void match_pose_to_frame(const dart::Model& base, const dart::Pose& pose, int frame, dart::Pose& out)
+{
+    dart::SE3 full_se3 = base.getTransformModelToCamera();
+    dart::SE3 frame_se3 = base.getTransformFrameToModel(frame);
+    out.setTransformModelToCamera(full_se3*frame_se3);
+    for(int i = 0; i < out.getArticulatedDimensions(); ++i)
+    {
+        for(int j = 0; j < pose.getArticulatedDimensions(); ++j)
+        {
+            string n1 = out.getReducedName(i);
+            string n2 = pose.getReducedName(j);
+            //cout << "'" << n1 << "', '" << n2 << "'" << endl;
+            // Check to see if the end of the joint name in full pose corresponds to
+            // a joint name in the hand pose.
+            if(n2.length() >= n1.length() && n2.compare(n2.length() - n1.length(), n1.length(), n1) == 0)
+                out.getArticulation()[i] = pose.getArticulation()[j];
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -41,7 +77,10 @@ int main(int argc, char** argv)
     string joint_topic;
     string topic_prefix;
     string pc_topic;
-    string model_inter_fp;
+    string hand_model;
+    string sync_topic;
+    bool use_sync;
+    
     try
     {
         TCLAP::CmdLine cmd("DART with ROS", ' ', "0.1");
@@ -49,14 +88,16 @@ int main(int argc, char** argv)
         TCLAP::ValueArg<std::string> rt("r","rgb_topic","The ROS topic to listen to for rgb data.",false,"/camera/rgb/image_color","string");
         TCLAP::ValueArg<std::string> va_url("u","url","The url that rviz can use to access the webserver on this machine. This is used to pass the model files to rviz.",false,"","string");
         TCLAP::ValueArg<std::string> va_wd("w","web_dir","The folder on this machine corresponding to the --url flag. The model files will be written here.",false,"","string");
-        TCLAP::ValueArg<std::string> mt("m","marker_topic","The topic the marker publisher will publish the model markers to.", false, "dart_markers", "string");
+        TCLAP::ValueArg<std::string> mt("m","marker_topic","The topic the marker publisher will publish the model markers to.", false, "dart/markers", "string");
         TCLAP::ValueArg<std::string> jt("j","joint_state_topic","The topic to listen to for the state of the robot joints.", false, "/robot/joint_states", "string");
         TCLAP::ValueArg<std::string> pc("","pointcloud_topic","The topic to publish the pointcloud data to.", false, "/dart/pointcloud", "string");
         TCLAP::ValueArg<std::string> model("o","robot_model","The xml file for the robot model.", true, "", "string");
         TCLAP::ValueArg<std::string> bowl("","bowl_model","The xml file for the bowl model (i.e., object on table).", true, "", "string");
         TCLAP::ValueArg<std::string> cup("","cup_model","The xml file for the cup model (i.e., object in robot's gripper).", true, "", "string");
-        TCLAP::ValueArg<std::string> model_inter("","robot_intersection","The text file detailing which frames of the robot model may intersect.", true, "", "string");
+        TCLAP::ValueArg<std::string> hand("","hand_model","The xml file for the robot's hand.", true, "", "string");
         TCLAP::ValueArg<std::string> prefix("","topic_prefix","Prefix to append to all INPUT ros topics, e.g., PREFIX/TOPIC. Useful when replaying rosbags.", false, "", "string");
+        TCLAP::ValueArg<std::string> st("","sync_topic","Topic to send all rosbag sync commands on.", false, "/dart/sync", "string");
+        TCLAP::SwitchArg sync("","sync","Send sync commands to rosbag player.", false);
         cmd.add(dt);
         cmd.add(rt);
         cmd.add(va_url);
@@ -68,7 +109,9 @@ int main(int argc, char** argv)
         cmd.add(pc);
         cmd.add(bowl);
         cmd.add(cup);
-        cmd.add(model_inter);
+        cmd.add(hand);
+        cmd.add(st);
+        cmd.add(sync);
         cmd.parse(argc, argv);
         depth_topic = dt.getValue();
         rgb_topic = rt.getValue();
@@ -81,7 +124,9 @@ int main(int argc, char** argv)
         pc_topic = pc.getValue();
         bowl_fp = bowl.getValue();
         cup_fp = cup.getValue();
-        model_inter_fp = model_inter.getValue();
+        hand_model = hand.getValue();
+        sync_topic = st.getValue();
+        use_sync = sync.getValue();
     }
     catch(TCLAP::ArgException &e)
     {
@@ -95,6 +140,8 @@ int main(int argc, char** argv)
     
     cout << "Listening for depth frames on topic: " << depth_topic << endl;
     cout << "Listening for rgb frames on topic: " << rgb_topic << endl;
+    cout << "Publishing markers to topic: " << marker_topic << endl;
+    cout << "Publishing pointlcoud to topic: " << pc_topic << endl;
 
 
     if(web_dir.size() == 0 || url.size() == 0)
@@ -130,7 +177,7 @@ int main(int argc, char** argv)
     
     dart::Tracker tracker;
     auto depthSource = shared_ptr<ROSDepthSource>(new ROSDepthSource());
-    depthSource->initialize(depth_topic, rgb_topic);
+    depthSource->initialize(depth_topic, rgb_topic, use_sync, sync_topic);
     depthSource->startRosSpinner();
     tracker.addDepthSource(depthSource.get());
     JointStateListener* jsl = new JointStateListener(joint_topic);
@@ -143,7 +190,7 @@ int main(int argc, char** argv)
     if(pcp.findTable(depthSource.get()))
     {
         printf("Found table.\n");
-        //mp->addUntrackedObject(pcp.getTablePose(), pcp.getTableSize());
+        mp->addUntrackedObject(pcp.getTablePose(), pcp.getTableSize());
         //mp->addUntrackedObject(pcp.table_points, -1);
         //mp->addUntrackedObject(pcp.table_points, 0);
         //mp->addUntrackedObject(pcp.table_points, 1);
@@ -167,20 +214,28 @@ int main(int argc, char** argv)
     }
                      
     // Add the robot model
-    {
-        tracker.addModel(model_fp);
+    dart::HostOnlyModel robot_model;
+    dart::readModelXML(model_fp.c_str(), robot_model);
+    robot_model.computeStructure();
+    dart::Pose robot_pose(default_pose_reduction(robot_model));
+    // Baxter specific pose.
+    robot_pose.setTransformModelToCamera(dart::SE3FromTranslation(-0.181 + 0.2, -0.016 + 0.5, -0.491 + 0.55)*dart::SE3FromQuaternion(-0.630, 0.619, -0.336, -0.326));
+    jsl->setModelJoints(&robot_pose);
+    robot_model.setPose(robot_pose);
+    
+    // Add the robot's hand.
+    int hand_frame;
+    {        
+        // For the baxter model, left hand is frame 18 and right is frame 9.
+        // See if the left gripper is above the table.
+        if((dart::SE3Invert(pcp.getTablePose())*SE3ToTranslation(robot_model.getTransformCameraToModel()*robot_model.getTransformFrameToModel(18))).z > 0)
+            hand_frame = LEFT_HAND_FRAME;
+        else
+            hand_frame = RIGHT_HAND_FRAME;
+        tracker.addModel(hand_model);
         dart::Pose& pose = tracker.getPose(0);
-        for (int i=0; i<pose.getArticulatedDimensions(); ++i) 
-            pose.getArticulation()[i] = (tracker.getModel(0).getJointMin(i) + tracker.getModel(0).getJointMax(i))/2.0;
-        // This pose is specific to a Baxter robot with a chest mounted RGBD camera.
-        pose.setTransformModelToCamera(dart::SE3FromTranslation(-0.181 + 0.2, -0.016 + 0.5, -0.491 + 0.55)*dart::SE3FromQuaternion(-0.630, 0.619, -0.336, -0.326));
-        jsl->setModelJoints(&pose);
+        match_pose_to_frame(robot_model, robot_pose, hand_frame, pose);
         tracker.getModel(0).setPose(pose);
-        int * selfIntersectionMatrix = dart::loadSelfIntersectionMatrix(model_inter_fp,tracker.getModel(0).getNumSdfs());
-        for(int i = 0; i < tracker.getModel(0).getNumSdfs()*tracker.getModel(0).getNumSdfs(); ++i)
-            selfIntersectionMatrix[i] = 0;
-        tracker.setIntersectionPotentialMatrix(0,selfIntersectionMatrix);
-        delete [] selfIntersectionMatrix;
     }
     
     // Next add the bowl.
@@ -192,26 +247,22 @@ int main(int argc, char** argv)
     }
     
     // Finally add the cup.
-    int cup_frame;
+    
     dart::SE3 cup_offset;
     {
     // For the baxter model, attach it to frame 18 for the left arm or 9 for the right.
         tracker.addModel(cup_fp);
         dart::Pose& pose = tracker.getPose(2);
         // See if the left gripper is above the table.
-        if((dart::SE3Invert(pcp.getTablePose())*SE3ToTranslation(tracker.getModel(0).getTransformCameraToModel()*tracker.getModel(0).getTransformFrameToModel(18))).z > 0)
-        {
-            cup_frame = 18;
+        if(hand_frame == LEFT_HAND_FRAME)
             cup_offset = dart::SE3FromTranslation(0,0,0.1)*dart::SE3FromRotationY(-M_PI/2);
-        }
         else
-        {
-            cup_frame = 9;
             cup_offset = dart::SE3FromTranslation(0,0,0.1)*dart::SE3FromRotationY(-M_PI/2)*dart::SE3FromRotationZ(M_PI);
-        }
-        pose.setTransformModelToCamera(tracker.getModel(0).getTransformCameraToModel()*tracker.getModel(0).getTransformFrameToModel(cup_frame)*cup_offset);
+        pose.setTransformModelToCamera(robot_model.getTransformCameraToModel()*robot_model.getTransformFrameToModel(hand_frame+2)*cup_offset);
         tracker.getModel(2).setPose(pose);
     }
+    
+    
     
     // Set up the optimization options.
     dart::Optimizer* optimizer = tracker.getOptimizer();
@@ -252,6 +303,12 @@ int main(int argc, char** argv)
     {
         pcp.computeCloudMask(depthSource.get());
         mp->setCloudMask(pcp.getHostMask());
+        
+        // Set the robot pose based on the joint angles since it's not tracked.
+        robot_pose.setTransformModelToCamera(robot_model.getTransformModelToCamera());
+        jsl->setModelJoints(&robot_pose);
+        robot_model.setPose(robot_pose);
+        
         if(is_tracking)
         {
             // Update pose using DART.
@@ -262,16 +319,13 @@ int main(int argc, char** argv)
         }
         else
         {
-            // Update pose based on joint positions.
-            dart::Pose& pose = tracker.getPose(0);
-            // Since we're not calling optimzePoses this needs to be set manually.
-            pose.setTransformModelToCamera(tracker.getModel(0).getTransformModelToCamera());
-            jsl->setModelJoints(&pose);
-            tracker.getModel(0).setPose(pose);
-            dart::Pose& pose2 = tracker.getPose(2);
-            pose2.setTransformModelToCamera(tracker.getModel(0).getTransformModelToCamera()*tracker.getModel(0).getTransformFrameToModel(cup_frame)*cup_offset);
-            tracker.getModel(2).setPose(pose2);
-            if(frame > rate*3)
+            dart::Pose& cup_pose = tracker.getPose(2);
+            cup_pose.setTransformModelToCamera(robot_model.getTransformModelToCamera()*robot_model.getTransformFrameToModel(hand_frame+2)*cup_offset);
+            tracker.getModel(2).setPose(cup_pose);
+            dart::Pose& hand_pose = tracker.getPose(0);
+            match_pose_to_frame(robot_model, robot_pose, hand_frame, hand_pose);
+            tracker.getModel(0).setPose(hand_pose);
+            if(frame > rate*1)
             {
                 is_tracking = true;
                 printf("Starting DART tracking...\n");
@@ -279,7 +333,7 @@ int main(int argc, char** argv)
         }
         
         auto header = depthSource->getHeader();
-        mp->update(tracker, header);
+        mp->update(tracker, {&robot_model}, header);
         mp->publishPointcloud(depthSource.get(), header);
         tracker.stepForward();
         //printf("%13.2f\n", header.stamp.toSec());

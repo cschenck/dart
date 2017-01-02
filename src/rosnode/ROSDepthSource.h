@@ -21,7 +21,7 @@ public:
 
     ~ROSDepthSource();
 
-    bool initialize(const string& depth_topic, const string& rgb_topic);
+    bool initialize(const string& depth_topic, const string& rgb_topic, bool sync, const string& sync_topic = "");
 
     const ushort *getDepth() const;
 
@@ -66,6 +66,8 @@ private:
     
     void swapColorPointers();
     
+    void sendSyncCommand();
+    
 
     ros::NodeHandle* rosNode;
     ros::Subscriber* sub;
@@ -91,7 +93,11 @@ private:
     uchar3* color_data_stable;
     pthread_mutex_t color_data_lock;
     
-    
+    bool _sync;
+    string _sync_topic;
+    ros::Publisher* _sync_pub;
+    string _depth_topic;
+    bool _new_data;
 };
 
 #endif

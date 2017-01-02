@@ -8,6 +8,7 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
+#include <std_msgs/String.h>
 
 #include "depth_sources/depth_source.h"
 
@@ -75,22 +76,40 @@ ROSDepthSource::~ROSDepthSource()
 
 }
 
-bool ROSDepthSource::initialize(const string& depth_topic, const string& rgb_topic) 
+bool ROSDepthSource::initialize(const string& depth_topic, const string& rgb_topic, bool sync, const string& sync_topic) 
 {
     sub = new ros::Subscriber(rosNode->subscribe(depth_topic, 1, &ROSDepthSource::setDepthData, this));
     colorSub = new ros::Subscriber(rosNode->subscribe(rgb_topic, 1, &ROSDepthSource::setColorData, this));
+    _depth_topic = depth_topic;
+    _new_data = false;
+    
+    _sync = sync;
+    if(_sync)
+    {
+        _sync_topic = sync_topic;
+        _sync_pub = new ros::Publisher(rosNode->advertise<std_msgs::String>(_sync_topic, 1));
+    }
 
     //get the first depth image before adding this to the tracker
     ros::Rate rate(100);
     printf("Waiting on first depth and color frames...\n");
     while(depth_data_volatile == NULL || color_data_volatile == NULL)
     {
+        if(_sync)
+            sendSyncCommand();
         ros::spinOnce();
         rate.sleep();
     }
     printf("Received first frames.\n");
 
     advance(); //make sure that the pointers for the tracker have data
+}
+
+void ROSDepthSource::sendSyncCommand()
+{
+    std_msgs::String msg;
+    msg.data = _depth_topic + " " + to_string(_frame);
+    _sync_pub->publish(msg);
 }
 
 
@@ -103,6 +122,13 @@ void ROSDepthSource::unsubscribeListener()
     colorSub->shutdown();
     delete colorSub;
     colorSub = NULL;
+    
+    if(_sync)
+    {
+        _sync_pub->shutdown();
+        delete _sync_pub;
+        _sync_pub = NULL;
+    }
 }
 
 
@@ -129,6 +155,7 @@ void ROSDepthSource::setDepthData(const sensor_msgs::ImageConstPtr& msg)
     _header_volatile = msg->header;
     
     memcpy(depth_data_volatile, msg->data.data(), msg->height*msg->width*sizeof(ushort));
+    _new_data = true;
     pthread_mutex_unlock(&depth_data_lock);
     
 }
@@ -185,6 +212,7 @@ void ROSDepthSource::swapDepthPointers()
     depth_data_stable = depth_data_volatile;
     depth_data_volatile = tmp;
     _header_stable = _header_volatile;
+    _new_data = false;
     pthread_mutex_unlock(&depth_data_lock);
 }
 
@@ -223,6 +251,20 @@ void ROSDepthSource::setFrame(const uint frame) {
 
 void ROSDepthSource::advance() 
 {
+    if(_sync)
+    {
+        _new_data = false;
+        sendSyncCommand();
+        ros::spinOnce();
+        ros::Rate rate(100);
+        while(!_new_data)
+        {
+            ros::spinOnce();
+            rate.sleep();
+            sendSyncCommand();
+        }
+    }
+    
     //make sure we have the most up to date data
     swapColorPointers();
     swapDepthPointers(); 

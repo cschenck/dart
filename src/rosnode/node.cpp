@@ -133,7 +133,7 @@ int main(int argc, char** argv)
     
     dart::Tracker tracker;
     auto depthSource = shared_ptr<ROSDepthSource>(new ROSDepthSource());
-    depthSource->initialize(depth_topic, rgb_topic);
+    depthSource->initialize(depth_topic, rgb_topic, false);
     depthSource->startRosSpinner();
     tracker.addDepthSource(depthSource.get());
     

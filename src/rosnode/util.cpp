@@ -32,10 +32,12 @@ string strprintf(const char* format, ...)
 string combine_paths(const string& left, const string& right)
 {
     string ret = left;
-    if(left[left.length()-1] != '/')
-        ret += '/';
-    ret += right;
-    return ret;
+    while(ret[ret.length()-1] == '/')
+        ret = ret.substr(0, ret.length()-1);
+    string mright = right;
+    while(mright[0] == '/')
+        mright = mright.substr(1);
+    return ret + "/" + mright;
 }
 
 float4 SE3ToQuaternion(const dart::SE3& source){

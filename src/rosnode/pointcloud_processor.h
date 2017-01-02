@@ -23,7 +23,7 @@
 #define OBJECT_CLUSTER_TOLERANCE 0.02
 #define OBJECT_MIN_CLUSTER_SIZE 2000
 
-using namespace std;
+using namespace std; 
 
 class PointcloudProcessor
 {
